@@ -5,10 +5,11 @@ import sys
 sys.path.append('../../')
 import os
 #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+import math
 import pickle
 import argparse
 import logging
-
+import json
 import tensorflow as tf
 tf.compat.v1.enable_eager_execution()
 
@@ -38,10 +39,12 @@ def parse_args():
 
     train_settings = parser.add_argument_group('train settings')
     train_settings.add_argument('--learning_rate', type=float, default=1e-2)
-    train_settings.add_argument('--batch_size', type=int, default=32)
+    train_settings.add_argument('--batch_size', type=int, default=64)
     train_settings.add_argument('--epochs', type=int, default=10)
     train_settings.add_argument('--user_count', type=int, default=0)
     train_settings.add_argument('--item_count', type=int, default=0)
+    train_settings.add_argument('--steps_per_epoch', type=int, default=0)
+    train_settings.add_argument('--val_steps', type=int, default=0)
 
     model_settings = parser.add_argument_group('model settings')
     model_settings.add_argument('--hidden_dim', type=int, default=100)
@@ -67,13 +70,18 @@ def train(args):
     """
     trains the reading comprehension model
     """
+    meta_path = os.path.join(args.data_dir, "datas.dump")
+    data = json.load(open(meta_path, "r"))
+    dev_len = data["dev_count"]
+    train_lens = data["train_count"]
+    buffer_size = args.batch_size * 50000
     logger = logging.getLogger("movielen mf")
-    train_dataset, dev_data, test_data, movie_count, user_count = \
-        make_netflix_dataset(args.train_files, args.dev_files, args.test_files, \
-            args.data_dir, args.batch_size, args.epochs)
-    args.user_count = user_count
-    args.item_count = movie_count
-
+    train_dataset, dev_data, test_data = \
+        make_netflix_dataset(args.data_dir, buffer_size, args.batch_size, args.epochs)
+    args.user_count = 480189
+    args.item_count = 17770
+    args.steps_per_epoch = math.ceil(train_lens / args.batch_size)
+    args.val_steps = math.ceil(dev_len / args.batch_size)
     logger.info('Initialize the model...')
     model = train_loop(args, train_dataset, dev_data)
     logger.info('Done with model training!')

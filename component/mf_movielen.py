@@ -24,13 +24,13 @@ class MF_Netflix(layers.Layer):
         """
         inputs:
             batch_user_ids
-            batch_item_ids
+            batch_movie_ids
         outputs:
             the prediction, user-item score
         """
-        batch_user_ids, batch_item_ids = inputs
+        batch_user_ids, batch_movie_ids = inputs
         batch_user_emb = self.user_layer(batch_user_ids)
-        batch_item_emb = self.item_layer(batch_item_ids)
+        batch_item_emb = self.item_layer(batch_movie_ids)
         batch_score = tf.reduce_sum(\
             tf.multiply(batch_user_emb, batch_item_emb), \
                 axis=1)
@@ -45,10 +45,10 @@ def train_loop(args, train_dataset, dev_dataset, test_dataset=None):
     with mirrored_strategy.scope():
         # build model
         user_ids = keras.Input(shape=(1,), dtype=tf.int32, name="user_id")
-        item_ids = keras.Input(shape=(1,), dtype=tf.int32, name="item_id")
+        movie_ids = keras.Input(shape=(1,), dtype=tf.int32, name="movie_id")
         batch_score = MF_Netflix(args.user_count, args.item_count, args.hidden_dim)(\
-            [user_ids, item_ids])
-        model = keras.Model(inputs={"user_id":user_ids, "item_id":item_ids}, \
+            [user_ids, movie_ids])
+        model = keras.Model(inputs={"user_id":user_ids, "movie_id":movie_ids}, \
             outputs=batch_score)
         # build the model train setting
         optimizer = keras.optimizers.Adam(args.learning_rate)
@@ -59,10 +59,11 @@ def train_loop(args, train_dataset, dev_dataset, test_dataset=None):
     checkpoint_callback = keras.callbacks.ModelCheckpoint(\
         filepath=args.model_path, save_best_only=True)
     tensorbaord_callback = keras.callbacks.TensorBoard(log_dir=args.summary_dir)
-    steps_per_epoch = 62500
+    steps_per_epoch = args.steps_per_epoch
     model.fit(train_dataset, epochs=args.epochs, \
         callbacks=[checkpoint_callback, tensorbaord_callback], \
-            validation_data=dev_dataset, steps_per_epoch=steps_per_epoch)
+            validation_data=dev_dataset, steps_per_epoch=steps_per_epoch, \
+                validation_steps=args.val_steps)
 
 
 if __name__ == "__main__":
@@ -70,8 +71,8 @@ if __name__ == "__main__":
     item_count = 10000
     hidden_dim = 300
     batch_user_ids = np.random.randint(1, user_count, 32)
-    batch_item_ids = np.random.randint(1, item_count, 32)
+    batch_movie_ids = np.random.randint(1, item_count, 32)
 
     mf_obj = MF_Netflix(user_count, item_count, hidden_dim)
     
-    print(mf_obj([batch_user_ids, batch_item_ids]))
+    print(mf_obj([batch_user_ids, batch_movie_ids]))

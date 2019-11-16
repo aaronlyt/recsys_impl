@@ -27,12 +27,13 @@ def make_netflix_dataset(data_dir, train_lens, batch_size, epochs):
     train_dataset = train_dataset.repeat(epochs)
     train_dataset = train_dataset.batch(batch_size)
     train_dataset = train_dataset.prefetch(2)
+    
 
     dev_dataset = dev_dataset.batch(batch_size)
     dev_dataset = dev_dataset.prefetch(2)
 
-    test_dataset = dev_dataset.batch(batch_size)
-    test_dataset = dev_dataset.prefetch(2)
+    test_dataset = test_dataset.batch(batch_size)
+    test_dataset = test_dataset.prefetch(2)
 
     return train_dataset, dev_dataset, test_dataset
 
@@ -97,7 +98,7 @@ def read_test_data(test_path, data_dir, movie_vocab, user_vocab):
     """
     test_datas_count = 0
     test_tfpath = os.path.join(data_dir, "test.tfrecord")
-    with tf.io.TFRecordWriter(test_tfpath, "w") as test_tfwriter:
+    with tf.io.TFRecordWriter(test_tfpath) as test_tfwriter:
         with open(test_path, "r") as reader:
             movie_id = ""
             for line in reader:
@@ -105,7 +106,10 @@ def read_test_data(test_path, data_dir, movie_vocab, user_vocab):
                     movie_id = line.strip().split(":")[0]
                 else:
                     userid, timestamp = line.strip().split(",")
-                    sample = [movie_vocab[movie_id], user_vocab[userid], 0, timestamp]
+                    try:
+                        sample = [movie_vocab[movie_id], user_vocab[userid], 0, timestamp]
+                    except:
+                        sample = [0, 0, 0, timestamp]
                     example = serialize_example(sample[0], sample[1], sample[2])
                     test_tfwriter.write(example)
                     test_datas_count += 1
@@ -129,10 +133,12 @@ def _parse_function(example_proto):
     feature_description = {
         'movie_id': tf.io.FixedLenFeature([], tf.int64, default_value=0),
         'user_id': tf.io.FixedLenFeature([], tf.int64, default_value=0),
-        'rating': tf.io.FixedLenFeature([], tf.float, default_value=0.0)
+        'rating': tf.io.FixedLenFeature([], tf.float32, default_value=0.0)
         }
-    return tf.io.parse_single_example(example_proto, feature_description)
+    prased_example = tf.io.parse_single_example(example_proto, feature_description)
 
+    return ({"movie_id": prased_example["movie_id"], \
+        "user_id":prased_example["user_id"]}, prased_example["rating"])
 
 def _float_feature(value):
     return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
@@ -147,8 +153,9 @@ if __name__ == "__main__":
     dev_path = "/home/lyt/workspace/recsys/data/netflixprize/probe.txt"
     test_path = "/home/lyt/workspace/recsys/data/netflixprize/qualifying.txt"
     data_dir = "/home/lyt/workspace/recsys/tf_impl_reco/data/"
-    #read_traindev_data(train_dir, dev_path, data_dir)
+    
+    make_tfrecords(train_dir, dev_path, test_path, data_dir)
 
     batch_size = 64
     epochs = 5
-    make_netflix_dataset(train_dir, dev_path, test_path, data_dir, batch_size, epochs, cache=True)
+    #make_netflix_dataset(data_dir, 147, batch_size, epochs)
