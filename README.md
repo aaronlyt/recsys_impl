@@ -1,6 +1,6 @@
-# recsys_impl implement recsys algorithm 
+# rrecsys algorithm 
 
-matrix factorization with temporal dynamics and bias(MF_Alg)
+matrix factorization with temporal dynamics and bias(MF_Alg: Matrix Factorization Techniques for Recommender Systems)
 
 # training dataset
 netflix
