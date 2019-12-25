@@ -87,7 +87,7 @@ def make_movielens_seqs_dataset(filepath, batch_size, dev_batch_size,epochs, tra
     start_time = time.time()
     dtype_dict = {"userId":np.int32, "movieId": np.int32, "rating":np.float32, \
         "timestamp":np.int32}
-    dataframe = pd.read_csv(filepath, dtype=dtype_dict).head(1000)
+    dataframe = pd.read_csv(filepath, dtype=dtype_dict)
     # user id mapping and movie id mapping
     userId_mapping = dict(\
         zip(dataframe["userId"].unique(), range(len(dataframe["userId"].unique())))\

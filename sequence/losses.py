@@ -38,11 +38,10 @@ def pointwise_loss(positive_predictions, negative_predictions, mask=None):
     loss = (positives_loss + negatives_loss)
 
     if mask is not None:
-        mask = mask.float()
+        mask = tf.cast(mask, tf.float32)
         loss = loss * mask
-        return loss.sum() / mask.sum()
 
-    return loss.mean()
+    return tf.math.reduce_mean(loss)
 
 
 def bpr_loss(positive_predictions, negative_predictions, sample=1, mask=None):
@@ -74,15 +73,14 @@ def bpr_loss(positive_predictions, negative_predictions, sample=1, mask=None):
        uncertainty in artificial intelligence. AUAI Press, 2009.
     """
     if sample == 1:
-        loss = -tf.log_sigmoid(positive_predictions - negative_predictions)
+        loss = -tf.math.log_sigmoid(positive_predictions - negative_predictions)
     else:
         pass
     if mask is not None:
-        mask = mask.float()
+        mask = tf.cast(mask, tf.float32)
         loss = loss * mask
-        return loss.sum() / mask.sum()
 
-    return loss.mean()
+    return tf.math.reduce_mean(loss)
 
 
 def hinge_loss(positive_predictions, negative_predictions, mask=None):
@@ -113,9 +111,8 @@ def hinge_loss(positive_predictions, negative_predictions, mask=None):
     loss = tf.math.maximum(neg_score - pos_score + 1, 0.0)
 
     if mask is not None:
-        mask = mask.float()
+        mask = tf.cast(mask, tf.float32)
         loss = loss * mask
-        return loss.sum() / mask.sum()
 
     return tf.math.reduce_mean(loss)
 
@@ -132,7 +129,6 @@ def adaptive_hinge_loss(positive_predictions, negative_predictions, mask=None):
 
     Parameters
     ----------
-
     positive_predictions: tensor
         Tensor containing predictions for known positive items.
     negative_predictions: tensor
@@ -142,16 +138,12 @@ def adaptive_hinge_loss(positive_predictions, negative_predictions, mask=None):
     mask: tensor, optional
         A binary tensor used to zero the loss from some entries
         of the loss tensor.
-
     Returns
     -------
-
     loss, float
         The mean value of the loss function.
-
     References
     ----------
-
     .. [2] Weston, Jason, Samy Bengio, and Nicolas Usunier. "Wsabie:
        Scaling up to large vocabulary image annotation." IJCAI.
        Vol. 11. 2011.
@@ -179,7 +171,7 @@ def regression_loss(observed_ratings, predicted_ratings):
     loss, float
         The mean value of the loss function.
     """
-    return ((observed_ratings - predicted_ratings) ** 2).mean()
+    return tf.math.reduce_mean(((observed_ratings - predicted_ratings) ** 2))
 
 
 def logistic_loss(observed_ratings, predicted_ratings):
