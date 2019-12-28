@@ -38,8 +38,8 @@ def parse_args():
                         help='evaluate the model on dev set')
     
     train_settings = parser.add_argument_group('train settings')
-    train_settings.add_argument('--learning_rate', type=float, default=5e-3)
-    train_settings.add_argument('--batch_size', type=int, default=32)
+    train_settings.add_argument('--learning_rate', type=float, default=1e-3)
+    train_settings.add_argument('--batch_size', type=int, default=64)
     train_settings.add_argument('--dev_batch_size', type=int, default=64)
     train_settings.add_argument('--epochs', type=int, default=5)
     train_settings.add_argument('--user_count', type=int, default=0)
