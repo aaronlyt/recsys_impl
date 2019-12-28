@@ -8,7 +8,7 @@ are returned by dataset-fetching and dataset-processing functions.
 
 import os
 import sys
-
+import collections
 import numpy as np
 import scipy.sparse as sp
 
@@ -105,6 +105,7 @@ class Interactions(object):
                  num_items=None):
 
         self.num_users = num_users or int(user_ids.max()) + 1
+        # item start from one
         self.num_items = num_items or int(item_ids.max()) + 1
 
         self.user_ids = user_ids
@@ -112,6 +113,12 @@ class Interactions(object):
         self.ratings = ratings
         self.timestamps = timestamps
         self.weights = weights
+
+        item_counter = [val[1] for val in \
+            sorted(collections.Counter(item_ids).items(), key=lambda x: x[0])]
+        self.item_frequency = np.array(item_counter) / sum(item_counter)
+        self.sampling_count = 1
+        self.pred_seq = True
 
     def to_sequence(self, max_sequence_length=10, min_sequence_length=None, step_size=None):
         """
@@ -189,40 +196,46 @@ class Interactions(object):
 
         num_subsequences = int(np.ceil(counts / float(step_size)).sum())
 
-        sequences = np.zeros((num_subsequences, max_sequence_length - 1),
+        sequences = np.zeros((num_subsequences, max_sequence_length),
                              dtype=np.int32)
-        sequence_users = np.empty(num_subsequences, dtype=np.int32)
-        sequence_targets = np.empty(num_subsequences, dtype=np.int32)
-        sequence_negs = np.empty(num_subsequences, dtype=np.int32)
-
+        sequence_users = np.zeros(num_subsequences, dtype=np.int32)
+        pred_sequence_len = max_sequence_length - 1
+        sequence_targets = np.zeros((num_subsequences, pred_sequence_len), dtype=np.int32)
+        sequence_negs = np.zeros((num_subsequences, pred_sequence_len, \
+            self.sampling_count), dtype=np.int32)
         for i, (uid,
                 seq) in enumerate(_generate_sequences(user_ids,
                                                       item_ids,
                                                       indices,
                                                       max_sequence_length,
                                                       step_size)):
-            # preversion
-            #sequences[i][-len(seq):] = seq
-            # now zeros padding at last
-            sequences[i][:len(seq)-1] = seq[:-1]
+            assert(max(seq) < self.num_items)
+            if len(seq) <= 1:
+                continue
             sequence_users[i] = uid
-            sequence_targets[i] = seq[-1]
-            assert(seq[-1] > 0)
-            neg = np.random.randint(1, self.num_items)
-            while neg == seq[-1]:
-                neg = np.random.randint(1, self.num_items)
+            real_seq_len = len(seq)
+            real_seq_pred_len = real_seq_len - 1
+            if self.pred_seq:
+                sequences[i][:real_seq_len] = seq
+                sequence_targets[i][:real_seq_pred_len] = seq[1:]
+            else:
+                sequences[i][:real_seq_pred_len] = seq[:-1]
+                sequence_targets[i] = seq[-1:]
+            # an array
+            neg_samples = np.random.choice(self.num_items - 1, \
+                    (real_seq_pred_len, self.sampling_count), p=self.item_frequency) + 1
+            assert(np.max(neg_samples) < self.num_items)
+            sequence_negs[i][:real_seq_pred_len, :] = neg_samples
 
-            sequence_negs[i] = neg
-            
         if min_sequence_length is not None:
-            long_enough = sequences[:, -min_sequence_length] != 0
+            long_enough = sequences[:, min_sequence_length] != 0
             sequences = sequences[long_enough ]
             sequence_users = sequence_users[long_enough]
             sequence_targets = sequence_targets[long_enough]
             sequence_negs = sequence_negs[long_enough]
 
         return sequence_users, sequence_targets, sequence_negs, sequences
-        
+
 
 if __name__ == "__main__":
     import pandas as pd

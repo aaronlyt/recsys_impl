@@ -75,7 +75,9 @@ def bpr_loss(positive_predictions, negative_predictions, sample=1, mask=None):
     if sample == 1:
         loss = -tf.math.log_sigmoid(positive_predictions - negative_predictions)
     else:
-        pass
+        positive_predictions = tf.tile(positive_predictions, [1, sample])
+        loss = -tf.math.log_sigmoid(positive_predictions - negative_predictions)
+        
     if mask is not None:
         mask = tf.cast(mask, tf.float32)
         loss = loss * mask
@@ -104,8 +106,6 @@ def hinge_loss(positive_predictions, negative_predictions, mask=None):
     loss, float
         The mean value of the loss function.
     """
-    #pos_score = tf.math.sigmoid(positive_predictions)
-    #neg_score = tf.math.sigmoid(positive_predictions)
     pos_score = positive_predictions
     neg_score = negative_predictions
     loss = tf.math.maximum(neg_score - pos_score + 1, 0.0)

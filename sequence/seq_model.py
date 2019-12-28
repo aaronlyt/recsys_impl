@@ -6,7 +6,8 @@ import sys
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
-from tf_impl_reco.sequence.repr_layer import *
+#from tf_impl_reco.sequence.repr_layer import *
+from tf_impl_reco.sequence.seq_pred_repr_layer import *
 from tf_impl_reco.sequence.losses import *
 from tf_impl_reco.utils.metrics import *
 
@@ -34,6 +35,7 @@ class SeqModel(object):
             self._loss_func = pointwise_loss
         elif config.loss_func == 'bpr':
             self._loss_func = bpr_loss
+            self._predict_batch = self._predict_batch_hinge
         elif config.loss_func == 'hinge':
             self._loss_func = hinge_loss
             self._predict_batch = self._predict_batch_hinge
@@ -50,28 +52,34 @@ class SeqModel(object):
             for batch_data in tqdm(train_data, total=args.steps_per_epoch):
                 loss = self._fit_batch(batch_data)
             print(loss)
-
             # at the condition, accuracy@N is the recall@N, and is the hits@N
-            m_acc = tf.metrics.SparseTopKCategoricalAccuracy(k=20)
-            m = NDGG(k=20)
+            #m_acc = tf.metrics.SparseTopKCategoricalAccuracy(k=20)
+            #m = DCG(k=20)
+            #m_mrr = MRR(k=self.config.item_count - 2)
+            all_mrr_sum = 0.0
+            all_mrr_count = 0
             for batch_data, label in tqdm(dev_data, total=args.val_steps):
                 # bs_size, num_items
-                prediction = self._predict_batch(batch_data)
-                m.update_state(label - 1, prediction)
-                m_acc.update_state(label - 1, prediction)
-            print("---epoch: %d, auc:%.4f, ncg:%.4f" %(epoch, m_acc.result(), \
-                m.result()))
-
+                prediction, mask = self._predict_batch(batch_data)
+                #print(np.max(prediction, axis=2))
+                #m.update_state(label - 1, prediction)
+                #m_mrr.update_state(label - 1, prediction, mask)
+                b_mrr, b_count = sequence_mrr(label.numpy(), prediction.numpy(), mask.numpy())
+                all_mrr_sum += b_mrr
+                all_mrr_count += b_count
+                #m_acc.update_state(label - 1, prediction)
+            mrr_val = all_mrr_sum / all_mrr_count
+            print("---epoch: %d, mrr:%.4f" %(epoch, mrr_val))
+    
     def _fit_batch(self, batch_data):
         """
         """
         inputs, target_id = batch_data
         sequence_ids, neg_id = inputs["sequence"], inputs["neg_id"]
         with tf.GradientTape() as tape:
-            pos_score = self._net(sequence_ids, target_id)
-            neg_score = self._net(sequence_ids, neg_id)
-            loss = self._loss_func(pos_score, neg_score)
-            #print(loss)
+            pos_score, mask = self._net(sequence_ids, target_id)
+            neg_score, _ = self._net(sequence_ids, neg_id)
+            loss = self._loss_func(pos_score, neg_score, mask)
         gradients = tape.gradient(loss, self._net.trainable_variables)
         self._optimizer.apply_gradients(zip(gradients, self._net.trainable_variables))
         
@@ -80,8 +88,10 @@ class SeqModel(object):
     def _predict_batch_hinge(self, batch_data):
         """
         """
-        prediction = self._net(batch_data["sequence"], training=False)
-        return prediction
+        prediction, mask = self._net(batch_data["sequence"], training=False)
+        mask = tf.expand_dims(tf.cast(mask, tf.float32), axis=2)
+        prediction = tf.multiply(prediction, mask)
+        return prediction, tf.squeeze(mask)
     
     def predict(self, input):
         """

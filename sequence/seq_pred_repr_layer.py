@@ -14,7 +14,7 @@ class DNNModel(keras.Model):
         """
         super(DNNModel, self).__init__()
         self.item_embeddings = keras.layers.Embedding(item_count, \
-            item_emb_dim, mask_zero=True, embeddings_initializer=keras.initializers.RandomNormal(0, 0.5))
+            item_emb_dim, mask_zero=True)
         self.dense_layers = []
         for units in mlp_units:
             self.dense_layers.append(keras.layers.Dense(units, activation="relu"))
@@ -22,24 +22,32 @@ class DNNModel(keras.Model):
 
     def call(self, sequence_ids, target_id=None, training=True):
         """
+        do not predict the first item
+        @param sequence_ids, bs_size, seq_len
+        @param target_id, are sequences in traning, (bs_size, seq_len, sample_count)
         """
         sequence_embs = self.item_embeddings(sequence_ids)
-        user_history_repr = tf.math.reduce_mean(sequence_embs, axis=1)
-
+        # bs_size, seq_len - 1, emb_dim, exclude last sum, remove zero
+        user_history_repr = tf.math.cumsum(sequence_embs, axis=1, exclusive=True)[:, 1:]
         for dense_layer in self.dense_layers:
             user_history_repr = dense_layer(user_history_repr)
             if training:
                 user_history_repr = self.dropout(user_history_repr, training=training)
         # cal score
         if training:
+            # bs_size, seq_len - 1, sample_count, dim
+            if len(target_id.shape) == 2:
+                target_id = tf.expand_dims(target_id, axis=2)
             target_emb = self.item_embeddings(target_id)
-            target_emb = tf.expand_dims(target_emb, axis=1)
         else:
+            # 1, 1, item_count, dim
             target_emb = tf.expand_dims(self.item_embeddings.embeddings[1:,:], axis=0)
-        user_history_repr = tf.expand_dims(user_history_repr, axis=1)
+            target_emb = tf.expand_dims(target_emb, axis=1)
+        user_history_repr = tf.expand_dims(user_history_repr, axis=2)
+        # bs_size, seq_len - 1, sample_count
         scores = tf.matmul(user_history_repr, target_emb, transpose_b=True)
         #print(scores)
-        return tf.squeeze(scores)
+        return tf.squeeze(scores), tf.squeeze(sequence_embs._keras_mask[:, :-1])
 
 
 class LSTMSeqModel(keras.Model):

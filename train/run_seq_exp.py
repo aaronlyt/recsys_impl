@@ -11,15 +11,14 @@ import logging
 import json
 import tensorflow as tf
 
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
-"""
+#os.environ["CUDA_VISIBLE_DEVICES"] = ""
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
 assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
 tf.config.experimental.set_memory_growth(physical_devices[0], True)
 tf.config.experimental.set_memory_growth(physical_devices[1], True)
 tf.config.threading.set_intra_op_parallelism_threads(4)
 tf.config.threading.set_inter_op_parallelism_threads(4)
-"""
+
 from tf_impl_reco.utils.movielens import read_movielens_20M
 from tf_impl_reco.utils.netflix import make_netflix_dataset, make_netflix_tensor_dataset
 from tf_impl_reco.utils.movielens import make_movielens_seqs_dataset
@@ -39,8 +38,8 @@ def parse_args():
                         help='evaluate the model on dev set')
     
     train_settings = parser.add_argument_group('train settings')
-    train_settings.add_argument('--learning_rate', type=float, default=1e-3)
-    train_settings.add_argument('--batch_size', type=int, default=256)
+    train_settings.add_argument('--learning_rate', type=float, default=5e-3)
+    train_settings.add_argument('--batch_size', type=int, default=32)
     train_settings.add_argument('--dev_batch_size', type=int, default=64)
     train_settings.add_argument('--epochs', type=int, default=5)
     train_settings.add_argument('--user_count', type=int, default=0)
@@ -49,12 +48,12 @@ def parse_args():
     train_settings.add_argument('--val_steps', type=int, default=0)
 
     model_settings = parser.add_argument_group('model settings')
-    model_settings.add_argument('--repr', type=str, default="lstm")
-    model_settings.add_argument('--loss_func', type=str, default="bpr")
+    model_settings.add_argument('--repr', type=str, default="dnn")
+    model_settings.add_argument('--loss_func', type=str, default="hinge")
     model_settings.add_argument('--optimizer', type=str, default=None)
     model_settings.add_argument('--item_emb_dim', type=int, default=32)
     model_settings.add_argument('--mlp_units', type=list, default=[])
-    model_settings.add_argument('--dropout_rate', type=float, default=0.2)
+    model_settings.add_argument('--dropout_rate', type=float, default=0.0)
  
     
     path_settings = parser.add_argument_group('path settings')
@@ -83,7 +82,7 @@ def train(args):
     
     train_dataset, dev_dataset, train_len, dev_len, user_count, item_count = \
         make_movielens_seqs_dataset(args.movielen_path, args.batch_size, args.dev_batch_size, 1, 0.9)
-    
+
     args.user_count = user_count
     args.item_count = item_count
     args.steps_per_epoch = math.floor(train_len / args.batch_size)

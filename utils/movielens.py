@@ -10,6 +10,7 @@ sys.path.append('../../')
 
 from tf_impl_reco.utils.seq_process import *
 
+
 def _parse_line(line, separator='::'):
 
     uid, iid, rating, timestamp = line.split(separator)
@@ -29,6 +30,7 @@ def _make_contiguous(data, separator):
         iid = item_map.setdefault(iid, len(item_map) + 1)
 
         yield uid, iid, rating, timestamp
+
 
 def make_df_dataset():
     """
@@ -71,17 +73,21 @@ def read_movielens_20M(filepath, batch_size, epochs, train_ratio=0.8):
     train_dataset = train_dataset.repeat(epochs)
     train_dataset = train_dataset.batch(batch_size)
     train_dataset = train_dataset.prefetch(2)
-    
+
     dev_dataset = dev_dataset.batch(batch_size)
     dev_dataset = dev_dataset.prefetch(2)
 
     user_count = max(dataframe["userId"])
     movie_count = max(dataframe["movieId"])
-    
+
     return train_dataset, dev_dataset, user_count, movie_count
 
 
-def make_movielens_seqs_dataset(filepath, batch_size, dev_batch_size,epochs, train_ratio=0.9):
+def make_movielens_seqs_dataset(filepath,
+                                batch_size,
+                                dev_batch_size,
+                                epochs,
+                                train_ratio=0.9):
     """
     """
     start_time = time.time()
@@ -98,19 +104,21 @@ def make_movielens_seqs_dataset(filepath, batch_size, dev_batch_size,epochs, tra
     movieId_mapping[0] = 0
 
     dataframe["userId"] = dataframe["userId"].map(lambda x: userId_mapping[x])
-    dataframe["movieId"] = dataframe["movieId"].map(lambda x: movieId_mapping[x])
+    dataframe["movieId"] = dataframe["movieId"].map(
+        lambda x: movieId_mapping[x])
     print("----read and transform datafram done---", time.time() - start_time)
+    print("----dataset length----", dataframe.shape)
     # get sequences
+
     inter_obj = Interactions(dataframe["userId"].values, dataframe["movieId"].values, \
         dataframe["rating"].values, dataframe["timestamp"].values)
-    sequence_users, sequence_targets, sequence_negs, sequences = inter_obj.to_sequence(step_size=2)
+    sequence_users, sequence_targets, sequence_negs, sequences = inter_obj.to_sequence(
+        200, 20)
     print("----to sequences done---", time.time() - start_time)
-    
     dataset_len = len(sequence_users)
     indices = np.random.permutation(range(dataset_len))
     train_len = int(dataset_len * train_ratio)
     dev_len = dataset_len - train_len
-
     train_dataset = tf.data.Dataset.from_tensor_slices(\
         ({"user_id": sequence_users[indices[:train_len]], \
             "sequence": sequences[indices[:train_len]], \
@@ -120,12 +128,12 @@ def make_movielens_seqs_dataset(filepath, batch_size, dev_batch_size,epochs, tra
         ({"user_id": sequence_users[indices[train_len:]], \
             "sequence": sequences[indices[train_len:]]}, \
             sequence_targets[indices[train_len:]]))
-    
+
     train_dataset = train_dataset.shuffle(train_len)
     train_dataset = train_dataset.repeat(epochs)
     train_dataset = train_dataset.batch(batch_size)
     train_dataset = train_dataset.prefetch(tf.data.experimental.AUTOTUNE)
-    
+
     dev_dataset = dev_dataset.batch(dev_batch_size)
     dev_dataset = dev_dataset.prefetch(tf.data.experimental.AUTOTUNE)
 
@@ -140,7 +148,7 @@ if __name__ == "__main__":
     #make_df_dataset()
     train_data, dev_data, train_len, dev_len, user_count, movie_coutn = \
         make_movielens_seqs_dataset("/home/lyt/workspace/recsys/data/ml-20m/ratings.csv", 64, 2)
-    
+
     for batch in train_data.take(1):
         print(batch)
 

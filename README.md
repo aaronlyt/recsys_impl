@@ -1,3 +1,6 @@
+# purpose
+learning
+
 # environment
 * python 3.6
 * tensorflow 2.0(keras API)
@@ -37,3 +40,9 @@ sequence processing: utils/seq_process.py
 
 * custom keras metrics
 NCG
+
+#### working
+sampling strategy: sampling with the frequency 
+loss function: multiple negtive samples
+
+optimizing: sequence loss, the loss function or the sampling strategy
