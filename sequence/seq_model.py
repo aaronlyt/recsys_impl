@@ -55,21 +55,14 @@ class SeqModel(object):
             # at the condition, accuracy@N is the recall@N, and is the hits@N
             #m_acc = tf.metrics.SparseTopKCategoricalAccuracy(k=20)
             #m = DCG(k=20)
-            #m_mrr = MRR(k=self.config.item_count - 2)
-            all_mrr_sum = 0.0
-            all_mrr_count = 0
+            m_mrr = MRR(k=self.config.item_count - 1)
             for batch_data, label in tqdm(dev_data, total=args.val_steps):
                 # bs_size, num_items
                 prediction, mask = self._predict_batch(batch_data)
-                #print(np.max(prediction, axis=2))
                 #m.update_state(label - 1, prediction)
-                #m_mrr.update_state(label - 1, prediction, mask)
-                b_mrr, b_count = sequence_mrr(label.numpy(), prediction.numpy(), mask.numpy())
-                all_mrr_sum += b_mrr
-                all_mrr_count += b_count
+                m_mrr.update_state(label - 1, prediction, mask)
                 #m_acc.update_state(label - 1, prediction)
-            mrr_val = all_mrr_sum / all_mrr_count
-            print("---epoch: %d, mrr:%.4f" %(epoch, mrr_val))
+            print("---epoch: %d, mrr:%.4f" %(epoch, mrr.result()))
     
     def _fit_batch(self, batch_data):
         """
