@@ -40,7 +40,7 @@ def parse_args():
     train_settings = parser.add_argument_group('train settings')
     train_settings.add_argument('--learning_rate', type=float, default=1e-3)
     train_settings.add_argument('--batch_size', type=int, default=64)
-    train_settings.add_argument('--dev_batch_size', type=int, default=64)
+    train_settings.add_argument('--dev_batch_size', type=int, default=16)
     train_settings.add_argument('--epochs', type=int, default=5)
     train_settings.add_argument('--user_count', type=int, default=0)
     train_settings.add_argument('--item_count', type=int, default=0)
@@ -48,10 +48,11 @@ def parse_args():
     train_settings.add_argument('--val_steps', type=int, default=0)
 
     model_settings = parser.add_argument_group('model settings')
+    #model_settings.add_argument('--repr', type=str, default="lstm_att")
     model_settings.add_argument('--repr', type=str, default="dnn")
     model_settings.add_argument('--loss_func', type=str, default="hinge")
     model_settings.add_argument('--optimizer', type=str, default=None)
-    model_settings.add_argument('--item_emb_dim', type=int, default=32)
+    model_settings.add_argument('--item_emb_dim', type=int, default=16)
     model_settings.add_argument('--mlp_units', type=list, default=[])
     model_settings.add_argument('--dropout_rate', type=float, default=0.0)
  
