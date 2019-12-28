@@ -41,12 +41,14 @@ sequence processing: utils/seq_process.py
 
 * custom keras metrics
 NCG
+MRR
 
-#### working
-sampling strategy: sampling with the frequency 
-loss function: multiple negtive samples
-
-optimizing: sequence loss, the loss function or the sampling strategy
-
+* evaluation
+dnn loss: tf.Tensor(0.26367342, shape=(), dtype=float32) ---epoch: 0, mrr:0.0223
+LSTM: loss: tf.Tensor(0.13960448, shape=(), dtype=float32) ---epoch: 3, mrr:0.0433
+attention: test OOM
 ### reference
 spotlight https://github.com/maciejkula/spotlight
+
+## TODO
+GRU4Rec
