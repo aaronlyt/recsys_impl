@@ -1,5 +1,5 @@
 """
-reference splotlight-master
+sequence to item prediction, predict last item
 """
 from tqdm import tqdm
 import numpy as np
