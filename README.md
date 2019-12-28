@@ -26,7 +26,8 @@ big dataframe multiprocessing process
 ### evaluation result
 MF_Alg: 49ms/step - loss: 0.8175 - mean_squared_error: 0.7460 - val_loss: 1.0178 - val_mean_squared_error: 0.9235
 
-## sequence recommendation system
+## sequence recommendation system(for learning purpose)
+
 ### algorithms
 DNN, LSTM, LSTM with attention
 
@@ -46,3 +47,6 @@ sampling strategy: sampling with the frequency
 loss function: multiple negtive samples
 
 optimizing: sequence loss, the loss function or the sampling strategy
+
+### reference
+spotlight https://github.com/maciejkula/spotlight

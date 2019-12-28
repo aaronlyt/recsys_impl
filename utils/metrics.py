@@ -56,16 +56,24 @@ class DCG(keras.metrics.Metric):
         @param: y_true, bs_size, seq_len
         @param: y_pred, bs_size, seq_len, num_units
         """
+        ncg_vals = []
         for seq_idx in range(y_pred.shape[1]):
-            y_true_idx = tf.expand_dims(y_true[:, seq_idx], axis=1)
+            y_true_idx = y_true[:, seq_idx]
+            # this method come from tf ranking
             top_k_indices = tf.math.top_k(y_pred[:, seq_idx, :], k=self.k)[1]
-            # find the position
-            positions = tf.where(tf.math.equal(y_true_idx, top_k_indices))[:, 1]
-            positions = tf.cast(positions, tf.float32)
-            ncgs = tf.math.log(2.0) / tf.math.log(positions + 2)
-
-            self.sum_weight.assign_add(tf.reduce_sum(ncgs))
-            self.total_count.assign_add(y_pred.shape[0])
+            ranks = tf.argsort(top_k_indices) + 1
+            # get the label ranks
+            label_indices = tf.stack([tf.range(tf.shape(y_true_idx)[0]), \
+                y_true_idx], axis=1)
+            label_ranks = tf.gather_nd(ranks, label_indices)
+            # bs_size,
+            label_ranks = tf.cast(label_ranks, tf.float32)
+            ncgs = tf.math.log(2.0) / tf.math.log(label_ranks + 2)
+            ncg_vals.append(ncgs)
+        ncg_vals = tf.stack(ncg_vals, axis=1)
+        ncg_vals = tf.math.multiply(ncg_vals, mask)
+        self.sum_weight.assign_add(tf.reduce_sum(ncg_vals))
+        self.total_count.assign_add(tf.math.reduce_sum(mask))
         
     def result(self):
         return tf.math.divide(self.sum_weight, self.total_count)
@@ -88,16 +96,22 @@ class MRR(keras.metrics.Metric):
         """
         mrr_vals = []
         for seq_idx in range(y_pred.shape[1]):
-            y_true_idx = tf.expand_dims(y_true[:, seq_idx], axis=1)
+            y_true_idx = y_true[:, seq_idx]
+            # this method come from tf ranking
             top_k_indices = tf.math.top_k(y_pred[:, seq_idx, :], k=self.k)[1]
-            # find the position
-            positions = tf.where(tf.math.equal(y_true_idx, top_k_indices))[:, 1]
-            print("---", positions)
+            ranks = tf.argsort(top_k_indices) + 1
+            # get the label ranks
+            label_indices = tf.stack([tf.range(tf.shape(y_true_idx)[0]), \
+                y_true_idx], axis=1)
+            label_ranks = tf.gather_nd(ranks, label_indices)
             # bs_size,
-            positions = tf.cast(positions, tf.float32) + 1.0
+            positions = tf.cast(label_ranks, tf.float32)
             mrr_val = 1.0 / positions
-            self.sum_weight.assign_add(tf.reduce_sum(mrr_vals))
-            self.total_count.assign_add(tf.math.reduce_sum(positions))
+            mrr_vals.append(mrr_val)
+        mrr_vals = tf.stack(mrr_vals, axis=1)
+        mrr_vals = tf.math.multiply(mrr_vals, mask)
+        self.sum_weight.assign_add(tf.reduce_sum(mrr_vals))
+        self.total_count.assign_add(tf.math.reduce_sum(mask))
 
     def result(self):
         return tf.math.divide(self.sum_weight, self.total_count)
@@ -110,7 +124,7 @@ def sequence_mrr(y_true, y_pred, mask):
     @param y_pred
     @param mask
     """
-    y_true = y_true - 1
+    #y_true = y_true - 1
     #print("---", y_true.shape, mask.shape)
     mrr_vals = []
     for seq_idx in range(y_pred.shape[1]):
@@ -120,6 +134,21 @@ def sequence_mrr(y_true, y_pred, mask):
         mrr_vals.append(np.array(mrr_val))
     mrr_vals = np.stack(mrr_vals, axis=1)
     mrr_vals = np.multiply(mrr_vals, mask)
-    #print("---", mrr_vals.shape)
+    print("---", mrr_vals.shape)
     return np.sum(mrr_vals), np.sum(mask)
-    
+
+
+if __name__ == "__main__":
+    label = tf.constant([[1, 2, 0], [2, 1, 1], \
+        [1, 0, 0]], dtype=tf.int32)
+    mask = tf.constant([[1.0, 1.0, 0.0], [1.0, 1.0, 1.0], \
+        [1.0, 0.0, 0.0]], dtype=tf.float32)
+    import numpy as np
+    np.random.seed(seed=1000)
+    preds = tf.constant(np.random.random_sample([3, 3, 3]))
+    print(preds)
+    print(sequence_mrr(label.numpy(), preds.numpy(), mask.numpy()))
+
+    m = MRR(3)
+    m.update_state(label, preds, mask)
+    print(m.result())
