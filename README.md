@@ -50,5 +50,23 @@ attention: test OOM
 ### reference
 spotlight https://github.com/maciejkula/spotlight
 
+excellent evaluation script: https://github.com/microsoft/recommenders/tree/9b6c065a77c07a60947e894a6b516be5cef14ca1/reco_utils/evaluation
+
+### GRU4Rec
+
+#### evaluation
+- Recall@20 epoch 5: 0.620944
+- MRR@20    epoch 5: 0.279456
+
+###### reference: 
+https://github.com/pcerdam/KerasGRU4Rec
+
+###### my works
+
+data proessing masks bug fix
+
+working with tensorflow 2.0
+
 ## TODO
-GRU4Rec
+
+FM, feature processing

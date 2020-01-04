@@ -61,8 +61,9 @@ class SeqModel(object):
                 prediction, mask = self._predict_batch(batch_data)
                 #m.update_state(label - 1, prediction)
                 m_mrr.update_state(label - 1, prediction, mask)
-                #m_acc.update_state(label - 1, prediction)
-            print("---epoch: %d, mrr:%.4f" %(epoch, mrr.result()))
+                #a , b = update_state(label - 1, prediction, mask, self.config.item_count - 1)
+                #print("---", a / b, tf.math.reduce_sum(mask))
+            print("---epoch: %d, mrr:%.4f" %(epoch, m_mrr.result()))
     
     def _fit_batch(self, batch_data):
         """
@@ -83,6 +84,7 @@ class SeqModel(object):
         """
         prediction, mask = self._net(batch_data["sequence"], training=False)
         mask = tf.expand_dims(tf.cast(mask, tf.float32), axis=2)
+        #print("----------", prediction.shape, mask.shape)
         prediction = tf.multiply(prediction, mask)
         return prediction, tf.squeeze(mask)
     

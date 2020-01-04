@@ -55,7 +55,7 @@ class LSTMSeqModel(keras.Model):
         """
         """
         super(LSTMSeqModel, self).__init__()
-        self.item_embeddings = keras.layers.Embedding(item_count, item_emb_dim, mask_zero=False)
+        self.item_embeddings = keras.layers.Embedding(item_count, item_emb_dim, mask_zero=True)
         self.lstm = keras.layers.LSTM(item_emb_dim, return_sequences=True)
         self.attention = attention
     
@@ -65,27 +65,28 @@ class LSTMSeqModel(keras.Model):
         @param target_id, are sequences in traning, (bs_size, seq_len, sample_count)
         """
         sequence_emb = self.item_embeddings(sequence_ids)
+        #bs_size, seq_len, dim
         lstm_seq_repr = self.lstm(sequence_emb[:, :-1])
 
         if training:
-            if len(target_emb.shape) == 2:
-                target_emb = tf.expand_dims(target_emb, axis=2)
+            if len(target_id.shape) == 2:
+                target_id = tf.expand_dims(target_id, axis=2)
             # target_emb, bs_size, seq_len, sample_count, dim
             target_emb = self.item_embeddings(target_id)
         else:
             # ignore padding item, item_count, emb_dim
             target_emb = self.item_embeddings.embeddings[1:, :]
             target_emb = tf.expand_dims(target_emb, axis=0)
-            target_emb = tf.exand_dims(target_emb, axis=1)
+            target_emb = tf.expand_dims(target_emb, axis=1)
         # bs_size, item_count(training is 1,  pred is item_total_count)
         if not self.attention:
-            user_repr = lstm_seq_repr
+            user_repr = tf.expand_dims(lstm_seq_repr, axis=2)
             # bs_size, seq_len - 1, sample_count
             score = tf.matmul(user_repr, target_emb, transpose_b=True)
         else:
             score = self.cal_pred_attention_score(lstm_seq_repr, target_emb)
 
-        return tf.squeeze(score)
+        return tf.squeeze(score), sequence_emb._keras_mask[:, :-1]
 
     def cal_pred_attention_score(self, sequence_emb, item_emb):
         """
@@ -93,12 +94,13 @@ class LSTMSeqModel(keras.Model):
         @param target_emb: (bsize, seq_len, sample_count, emb_dim)
         return: score logits, bs_size, item_count
         """
-        #bs_size, 1, seq_len, emb_dim
-        sequence_emb = tf.expand_dims(sequence_emb, axis=1)
-        # bs_size, seq_len, item_count, seq_len
+        #bs_size, seq_len, 1, emb_dim
+        sequence_emb = tf.expand_dims(sequence_emb, axis=2)
+        # bs_size, seq_len, sample_count, seq_len
         sim_logits = tf.matmul(item_emb, sequence_emb, transpose_b=True)
         weight = tf.math.softmax(sim_logits, axis=-1)
-        # user repr, bs_size, seq_len, item_count, emb_dim
-        user_repr = tf.matmul(weight, sequence_emb, transpose_a=True)
+        # user repr, bs_size, seq_len, sample_count, emb_dim
+        #print("-------****-------", weight.shape, sequence_emb.shape, item_emb.shape)
+        user_repr = tf.matmul(weight, sequence_emb)
         pred_logits = tf.math.reduce_sum(user_repr * item_emb, axis=-1)
         return pred_logits

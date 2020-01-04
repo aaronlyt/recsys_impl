@@ -18,6 +18,7 @@ import numpy as np
 from scipy import stats
 import tensorflow as tf
 import tensorflow.keras as keras
+from tensorflow.python.ops.losses import util as tf_losses_util
 
 
 def getHitRatio(y_true, y_pred, k=10):
@@ -61,11 +62,11 @@ class DCG(keras.metrics.Metric):
             y_true_idx = y_true[:, seq_idx]
             # this method come from tf ranking
             top_k_indices = tf.math.top_k(y_pred[:, seq_idx, :], k=self.k)[1]
-            ranks = tf.argsort(top_k_indices) + 1
+            ranks = tf.argsort(top_k_indices)
             # get the label ranks
             label_indices = tf.stack([tf.range(tf.shape(y_true_idx)[0]), \
                 y_true_idx], axis=1)
-            label_ranks = tf.gather_nd(ranks, label_indices)
+            label_ranks = tf.gather_nd(ranks, label_indices) + 1
             # bs_size,
             label_ranks = tf.cast(label_ranks, tf.float32)
             ncgs = tf.math.log(2.0) / tf.math.log(label_ranks + 2)
@@ -78,7 +79,34 @@ class DCG(keras.metrics.Metric):
     def result(self):
         return tf.math.divide(self.sum_weight, self.total_count)
 
-        
+
+def update_state(y_true, y_pred, mask, k):
+    """
+    @param y_true
+    @param y_pred, had been masked
+    @mask mask
+    """
+    mrr_vals = []
+    for seq_idx in range(y_pred.shape[1]):
+        y_true_idx = y_true[:, seq_idx]
+        # this method come from tf ranking
+        _, top_k_indices = tf.math.top_k(y_pred[:, seq_idx, :], k=k)
+        ranks = tf.argsort(top_k_indices)
+        # get the label ranks
+        label_indices = tf.stack([tf.range(tf.shape(y_true_idx)[0]), \
+            y_true_idx], axis=1)
+        label_ranks = tf.gather_nd(ranks, label_indices) + 1
+        # bs_size,
+        positions = tf.cast(label_ranks, tf.float32)
+        mrr_val = tf.divide(1.0, positions)
+        print(positions)
+        print(mrr_val)
+        mrr_vals.append(mrr_val)
+    mrr_vals = tf.stack(mrr_vals, axis=1)
+    mrr_vals = tf.math.multiply(mrr_vals, mask)
+    return tf.math.reduce_sum(mrr_vals), tf.math.reduce_sum(mask)
+    
+
 class MRR(keras.metrics.Metric):
     def __init__(self, k, name="mrr", **kwargs):
         super(MRR, self).__init__(name=name, **kwargs)
@@ -87,7 +115,7 @@ class MRR(keras.metrics.Metric):
         self.sum_weight = self.add_weight(name="mrr_sum", initializer="zeros")
         # total sample weight
         self.total_count = self.add_weight(name="sample_count", initializer="zeros")
-        
+    
     def update_state(self, y_true, y_pred, mask):
         """
         @param y_true
@@ -98,15 +126,15 @@ class MRR(keras.metrics.Metric):
         for seq_idx in range(y_pred.shape[1]):
             y_true_idx = y_true[:, seq_idx]
             # this method come from tf ranking
-            top_k_indices = tf.math.top_k(y_pred[:, seq_idx, :], k=self.k)[1]
-            ranks = tf.argsort(top_k_indices) + 1
+            _, top_k_indices = tf.math.top_k(y_pred[:, seq_idx, :], k=self.k)
+            ranks = tf.argsort(top_k_indices)
             # get the label ranks
             label_indices = tf.stack([tf.range(tf.shape(y_true_idx)[0]), \
                 y_true_idx], axis=1)
-            label_ranks = tf.gather_nd(ranks, label_indices)
+            label_ranks = tf.gather_nd(ranks, label_indices) + 1
             # bs_size,
             positions = tf.cast(label_ranks, tf.float32)
-            mrr_val = 1.0 / positions
+            mrr_val = tf.divide(1.0, positions)
             mrr_vals.append(mrr_val)
         mrr_vals = tf.stack(mrr_vals, axis=1)
         mrr_vals = tf.math.multiply(mrr_vals, mask)
@@ -115,6 +143,17 @@ class MRR(keras.metrics.Metric):
 
     def result(self):
         return tf.math.divide(self.sum_weight, self.total_count)
+
+
+class AUC_T(keras.metrics.AUC):
+    def __init__(self, name="auc_t", **kwargs):
+        super(AUC_T, self).__init__(name=name, **kwargs)
+    
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        """
+        """
+        y_pred, y_true = tf_losses_util.squeeze_or_expand_dimensions(y_pred, y_true)
+        super(AUC_T, self).update_state(y_true, y_pred, sample_weight)
 
 
 def sequence_mrr(y_true, y_pred, mask):
