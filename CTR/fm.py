@@ -32,6 +32,7 @@ class FM_model(keras.layers.Layer):
             embeddings_regularizer=regularizer, embeddings_initializer=initializer)
         self.dense_linear = keras.layers.Dense(1, kernel_regularizer=regularizer, use_bias=False)
         self.bias = tf.Variable([0.0])
+        self.batch_normalization = keras.layers.BatchNormalization()
     
     def fm_call_impl1(self, dense_inputs, sparse_inputs, logits=False):
         # first order part, (bs_size, 1)
@@ -62,6 +63,7 @@ class FM_model(keras.layers.Layer):
         # concat the dense and sparse input
         sparse_inputs = tf.reshape(sparse_inputs, [-1, self.sp_field_count, self.sp_dim])
         inputs = tf.concat([dense_inputs_emb, sparse_inputs], axis=1)
+        #inputs = self.batch_normalization(inputs)
         # first order
         linear_logits = tf.reduce_sum(inputs[:, :, 0], axis=1)
         linear_logits = tf.reshape(linear_logits, [-1])
@@ -117,6 +119,7 @@ def fm_model_func(sp_feat_dim, feature_columns, sp_feats, dense_feats, initializ
     metrics = [AUC_T()]
     optimizer = keras.optimizers.Adam(1e-4)
     model.compile(optimizer="adam", loss=loss, metrics=metrics)
+    
     return model
 
 
@@ -124,8 +127,8 @@ if __name__ == "__main__":
     dataset_dir = "/home/lyt/workspace/recsys/data/criteo_data/"
     # for debug
     #dataset_dir = "/home/lyt/workspace/recsys/data/criteo_data/debug_data"
-    epochs = 10
-    shuff_buffer = 20480
+    epochs = 2
+    shuff_buffer = 500000
     batch_size = 2048
     sp_feat_dim = 11
     initializer = tf.keras.initializers.RandomUniform(seed=1024)
@@ -137,7 +140,6 @@ if __name__ == "__main__":
     
     fm_model = fm_model_func(sp_feat_dim, feature_columns, sparse_features, dense_features, initializer)
     
-    #train_model(fm_model, train_dataset, optimizer, epochs)
-
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="./data/summary/fm/", histogram_freq=1)
     fm_model.fit(train_dataset, validation_data=dev_dataset, epochs=epochs, \
-            steps_per_epoch=train_epoch_iters, validation_steps=dev_epoch_iters)
+            steps_per_epoch=train_epoch_iters, validation_steps=dev_epoch_iters, callbacks=[tensorboard_callback])

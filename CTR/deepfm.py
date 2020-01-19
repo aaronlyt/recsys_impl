@@ -8,14 +8,14 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 from tf_impl_reco.utils.metrics import AUC_T
-from run_exp import FM_model
+from fm import FM_model
 from tf_impl_reco.CTR.inputs import *
 
 
 class DeepFM(keras.layers.Layer):
-    def __init__(self, fm_units, deep_units, field_count):
+    def __init__(self, fm_units, deep_units, ds_field_count, sp_field_count, initializer):
         super(DeepFM, self).__init__()
-        self.fm_model = FM_model(fm_units, field_count)
+        self.fm_model = FM_model(ds_field_count, sp_field_count, fm_units, initializer)
         self.deep_layers = []
         self.batch_normalization_layers = []
         for idx, unit in enumerate(deep_units):
@@ -39,7 +39,7 @@ class DeepFM(keras.layers.Layer):
         return outputs
 
 
-def deepfm_model_def(sp_dim, deep_units, feature_columns, sp_feats, dense_feats):
+def deepfm_model_def(sp_dim, deep_units, feature_columns, sp_feats, dense_feats, initializer):
     """
     @param fm_units
     @param deep_units
@@ -61,7 +61,8 @@ def deepfm_model_def(sp_dim, deep_units, feature_columns, sp_feats, dense_feats)
     dense_features = keras.layers.DenseFeatures(feature_columns[:len(dense_feats)])(dense_inputs)
     sparse_features = keras.layers.DenseFeatures(feature_columns[len(dense_feats):])(sparse_inputs)
 
-    outputs = DeepFM(sp_dim, deep_units, len(sp_feats))(dense_features, sparse_features)
+    outputs = DeepFM(sp_dim, deep_units, len(dense_feats), len(sp_feats), \
+        initializer)(dense_features, sparse_features)
     model = keras.Model(inputs=inputs, outputs=outputs)
 
     loss = keras.losses.BinaryCrossentropy()
@@ -83,22 +84,17 @@ if __name__ == "__main__":
     epochs = 1
     shuff_buffer = 500000
     batch_size = 256
-    sp_feat_dim = 10
+    sp_feat_dim = 11
     deep_units = [400, 400, 1]
-
-    feature_columns = create_feature_columns(dataset_dir, sp_feat_dim, False)
+    initializer = tf.keras.initializers.RandomUniform(seed=1024)
+    feature_columns = create_feature_columns(dataset_dir, sp_feat_dim, initializer, \
+        is_debug=False)
     train_dataset, dev_dataset, sparse_features, dense_features, \
         train_epoch_iters, dev_epoch_iters = criteo_data_input(dataset_dir, feature_columns, \
             epochs=epochs, sp_feat_dim=sp_feat_dim, batch_size=batch_size, shuffle_buffer=shuff_buffer)
     
-    fm_model = deepfm_model_def(sp_feat_dim, deep_units, feature_columns, sparse_features, dense_features)
-
-    binary_loss = keras.losses.BinaryCrossentropy()
-    for batch, label in train_dataset.take(1):
-        assert(len(label.shape)==1)
-        output = fm_model(batch)
-        loss = binary_loss(label, output)
-        print(loss)
+    fm_model = deepfm_model_def(sp_feat_dim, deep_units, feature_columns, \
+        sparse_features, dense_features, initializer)
 
     fm_model.fit(train_dataset, validation_data=dev_dataset, epochs=epochs, \
             steps_per_epoch=train_epoch_iters, validation_steps=dev_epoch_iters)

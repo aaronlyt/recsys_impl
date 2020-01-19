@@ -1,5 +1,5 @@
 # purpose
-learning
+learning, try to reproduce the results of the paper
 
 # environment
 * python 3.6
@@ -101,8 +101,12 @@ criteo_data.py: two kinds of tensorflow dataset api, textlinedataset and tfrecor
 
 20429/20429 [==============================] - 3155s 154ms/step - loss: 0.5145 - auc_t: 0.7551 - val_loss: 0.5160 - val_auc_t: 0.7530
 
+### deepfm
+
+*evaluation
+
+163439/163439 [==============================] - 11687s 72ms/step - loss: 0.4795 - auc_t: 0.7867 - val_loss: 0.4795 - val_auc_t: 0.7879
+
 ## TODO
 
-optimizing deepfm
-
-FM, feature processing
+optimizing the fm and deepfm, DIN network
